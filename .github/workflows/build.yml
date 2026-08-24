@@ -1,0 +1,106 @@
+name: Build APK & Windows
+
+# main branch-এ push হলে, pull request খুললে, অথবা ম্যানুয়ালি "Run workflow"
+# চাপলে — এই তিনভাবেই বিল্ড চলবে। "v1.0.0"-এর মতো ট্যাগ push করলে দুটো বিল্ডই
+# একটা GitHub Release-এ অ্যাটাচ হয়ে যাবে।
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  # ================= ANDROID (সব Android — মোবাইল/ট্যাব/টিভি একই APK) =================
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze (এরর হলেও বিল্ড থামবে না, শুধু রিপোর্ট দেখাবে)
+        run: flutter analyze || true
+
+      # --release-এর বদলে universal APK (সব ABI-তে চলবে — arm/arm64/x86_64)
+      - name: Build APK (release, universal)
+        run: flutter build apk --release
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: remote-screen-android-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+
+  # ================= WINDOWS (কম্পিউটার) =================
+  build-windows:
+    name: Build Windows EXE
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze (এরর হলেও বিল্ড থামবে না, শুধু রিপোর্ট দেখাবে)
+        run: flutter analyze
+        continue-on-error: true
+
+      - name: Enable Windows desktop support
+        run: flutter config --enable-windows-desktop
+
+      - name: Build Windows (release)
+        run: flutter build windows --release
+
+      # পুরো Release ফোল্ডার (exe + দরকারি .dll + data) একটা zip-এ — এটাই
+      # ব্যবহারকারীকে দেওয়ার মতো ইনস্টলযোগ্য বান্ডেল
+      - name: Zip the Windows build
+        run: |
+          Compress-Archive -Path "build\windows\x64\runner\Release\*" -DestinationPath "remote-screen-windows.zip"
+        shell: pwsh
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: remote-screen-windows
+          path: remote-screen-windows.zip
+          if-no-files-found: error
+
+  # ================= RELEASE (শুধু ট্যাগ push হলে) =================
+  release:
+    name: Attach builds to GitHub Release
+    needs: [build-android, build-windows]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create/Update Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/remote-screen-android-apk/app-release.apk
+            artifacts/remote-screen-windows/remote-screen-windows.zip

@@ -1,0 +1,74 @@
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    id "dev.flutter.flutter-gradle-plugin"
+}
+
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader("UTF-8") { reader ->
+        localProperties.load(reader)
+    }
+}
+
+def flutterVersionCode = localProperties.getProperty("flutter.versionCode")
+if (flutterVersionCode == null) {
+    flutterVersionCode = "1"
+}
+
+def flutterVersionName = localProperties.getProperty("flutter.versionName")
+if (flutterVersionName == null) {
+    flutterVersionName = "1.0"
+}
+
+android {
+    // ⚠️ প্যাকেজ নাম — lib/*.kt ফাইলগুলোর package declaration আর এটা একই থাকতে হবে
+    namespace "com.example.remotescreen"
+    compileSdk flutter.compileSdkVersion
+    ndkVersion flutter.ndkVersion
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
+
+    sourceSets {
+        main.java.srcDirs += "src/main/kotlin"
+    }
+
+    defaultConfig {
+        applicationId "com.example.remotescreen"
+        // flutter_webrtc + MediaProjection/AccessibilityService নির্ভরতার জন্য 24 (Android 7.0)-এর
+        // নিচে নামানো উচিত না — নিচে নামালে বিল্ড/রানটাইম এরর হতে পারে
+        minSdk 24
+        targetSdk flutter.targetSdkVersion
+        versionCode flutterVersionCode.toInteger()
+        versionName flutterVersionName
+        multiDexEnabled true
+    }
+
+    buildTypes {
+        release {
+            // ⚠️ এখন debug key দিয়ে সাইন হচ্ছে, যাতে CI থেকে সরাসরি ইনস্টলযোগ্য
+            // APK পাওয়া যায়। Play Store-এ পাবলিশ করার আগে এখানে আসল release
+            // keystore বসাতে হবে (এবং GitHub Actions-এ secrets থেকে পাস করতে হবে)।
+            signingConfig signingConfigs.debug
+            minifyEnabled false
+            shrinkResources false
+        }
+    }
+}
+
+flutter {
+    source "../.."
+}
+
+dependencies {
+    implementation "androidx.multidex:multidex:2.0.1"
+}

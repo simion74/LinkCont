@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- অ্যাপ চালু হওয়ার সময় Flutter engine লোড না হওয়া পর্যন্ত এই ব্যাকগ্রাউন্ডটা
+     দেখা যায় — অ্যাপের নিজের ডার্ক নেভি থিমের সাথে মিলিয়ে রাখা হয়েছে, যাতে
+     সাদা স্ক্রিন ফ্ল্যাশ না করে। -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/launch_background_color" />
+</layer-list>

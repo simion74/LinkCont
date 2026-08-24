@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Flutter engine লোড হওয়ার আগ পর্যন্ত দেখানো theme —
+         AndroidManifest.xml-এর MainActivity-তে android:theme="@style/LaunchTheme" হিসেবে ব্যবহৃত -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+    </style>
+
+    <!-- Flutter UI দেখানো শুরু হওয়ার পর ব্যবহৃত theme -->
+    <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowBackground">@color/launch_background_color</item>
+    </style>
+</resources>

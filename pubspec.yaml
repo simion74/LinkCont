@@ -1,0 +1,33 @@
+name: linkcont
+description: LinkCont — P2P live screen share + remote control (Connect, Share, Control)
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_webrtc: ^0.11.7      # WebRTC পিয়ার কানেকশন, স্ক্রিন-ক্যাপচার স্ট্রিম হ্যান্ডলিং
+  web_socket_channel: ^2.4.0   # শুধু signaling-এর জন্য (SDP/ICE পাস করাতে)
+  permission_handler: ^11.3.0
+  shared_preferences: ^2.2.3  # ফোনে স্থায়ী ইউনিক আইডি সেভ রাখতে
+  share_plus: ^10.1.2  # আইডি মেইল/হোয়াটসঅ্যাপ/অন্য অ্যাপ দিয়ে শেয়ার করতে
+  flutter_foreground_task: ^6.5.0  # স্ক্রিন-শেয়ার চলাকালীন foreground service (Android আবশ্যিক)
+  google_fonts: ^6.2.1  # LinkCont লোগো-টেক্সটের জন্য Poppins ফন্ট (নিজে থেকে ডাউনলোড/ক্যাশে করে)
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/image/bg_frem.webp
+    - assets/image/screen_frem.webp
+    - assets/image/pc_tv_frem.webp
+    - assets/image/desing_icon.webp
+    - assets/image/icon.webp
+    - assets/image/computer_icon.webp
+    - assets/image/software_icon.webp

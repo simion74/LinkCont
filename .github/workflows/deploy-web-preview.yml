@@ -1,0 +1,53 @@
+name: Deploy Web Preview (GitHub Pages)
+
+# শুধু UI/ডিজাইন দেখার জন্য একটা শেয়ারযোগ্য লিংক — main-এ push হলেই অটো আপডেট
+# হবে। এটা শুধু প্রিভিউ; স্ক্রিন-শেয়ার/রিমোট-কন্ট্রোলের আসল ফাংশনালিটি এখানে
+# কাজ করবে না (সেগুলো Android/Windows-স্পেসিফিক নেটিভ ফিচার)।
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Enable web support
+        run: flutter config --enable-web
+
+      # GitHub Pages প্রজেক্ট-পেজ হিসেবে সার্ভ হয় (https://<user>.github.io/<repo>/),
+      # তাই base-href রিপোর জিটোরির নাম দিয়ে সেট করতে হয় — নাহলে CSS/JS/asset
+      # লোড হবে না
+      - name: Build web (release)
+        run: flutter build web --release --base-href "/${{ github.event.repository.name }}/"
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

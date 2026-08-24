@@ -1,0 +1,73 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.example.remotescreen">
+
+    <!-- স্ক্রিন ক্যাপচার (MediaProjection) চলাকালীন foreground service চালাতে লাগবে -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Local Network (IP) মোডে এই ডিভাইসের নিজের LAN IP বের করার জন্য -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+
+    <!-- অ্যাপ মোবাইল/ট্যাব/টিভি সবগুলোতেই একই APK দিয়ে চলবে, তাই টাচস্ক্রিন
+         বাধ্যতামূলক না — Android TV-তে টাচস্ক্রিন থাকে না -->
+    <uses-feature
+        android:name="android.hardware.touchscreen"
+        android:required="false" />
+    <uses-feature
+        android:name="android.software.leanback"
+        android:required="false" />
+
+    <application
+        android:label="LinkCont"
+        android:icon="@mipmap/ic_launcher"
+        android:banner="@mipmap/ic_launcher">
+        <!-- ⚠️ android:banner আপাতত ic_launcher দিয়ে বসানো হলো, যাতে Android TV
+             লঞ্চারে অ্যাপটা দেখাতে সমস্যা না হয়। ভালো দেখানোর জন্য পরে
+             320x180 dp সাইজের একটা আলাদা TV banner ছবি বানিয়ে
+             res/drawable/tv_banner.png বা mipmap হিসেবে বসিয়ে এখানে
+             android:banner="@drawable/tv_banner" করে দিলেই যথেষ্ট। -->
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Android TV হোম-স্ক্রিনের লঞ্চারে অ্যাপটা যেন দেখা যায় -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+            <!-- Flutter UI চালু হওয়ার পর এই থিমে বদলায় (splash → app) -->
+            <meta-data
+                android:name="io.flutter.embedding.android.NormalTheme"
+                android:resource="@style/NormalTheme" />
+        </activity>
+
+        <!-- Flutter-এর নতুন (v2) embedding ব্যবহার হচ্ছে তা নির্দেশ করে — সব
+             আধুনিক Flutter প্রজেক্টে আবশ্যিক -->
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+
+        <!-- রিমোট কন্ট্রোল ইভেন্ট (ট্যাপ/সোয়াইপ/স্ক্রল) স্ক্রিনে প্লে করার জন্য -->
+        <service
+            android:name=".RemoteAccessibilityService"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+    </application>
+</manifest>

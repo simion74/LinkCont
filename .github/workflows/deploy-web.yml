@@ -1,0 +1,40 @@
+name: Deploy Flutter Web Preview to GitHub Pages
+
+# main/master ব্রাঞ্চে পুশ করলেই স্বয়ংক্রিয়ভাবে চলবে
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch: # চাইলে GitHub-এর Actions ট্যাব থেকে ম্যানুয়ালিও রান করা যাবে
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.0'
+          channel: 'stable'
+
+      - run: flutter pub get
+
+      # রিপোর নাম অনুযায়ী base-href সেট করা হচ্ছে (GitHub Pages সাব-পাথে হোস্ট
+      # করে, যেমন username.github.io/LinkCont/) — নাহলে CSS/JS লোড হবে না
+      - run: flutter build web --release --base-href "/${{ github.event.repository.name }}/"
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

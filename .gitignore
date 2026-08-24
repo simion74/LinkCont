@@ -1,0 +1,55 @@
+# ফ্লাটার/ডার্ট টুলিং নিজে থেকেই যেসব ফাইল বানায় — এগুলো গিটে রাখার দরকার নেই
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+*.lock
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# --- Android ---
+android/local.properties
+android/key.properties
+android/.gradle/
+android/captures/
+android/gradlew.log
+**/android/**/gradle-wrapper.jar.log
+*.jks
+*.keystore
+
+# --- iOS/macOS (রাখা হয়েছে, শুধু ফাইল এরর না হওয়ার জন্য — বিল্ড করা হচ্ছে না) ---
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/App.framework
+**/Flutter/ephemeral/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+
+# --- Windows ---
+windows/flutter/ephemeral/
+windows/flutter/generated_plugin_registrant.cc
+windows/flutter/generated_plugin_registrant.h
+windows/flutter/generated_plugins.cmake
+
+# --- Linux/macOS (আপাতত ব্যবহার হচ্ছে না, তবু নিরাপদ থাকার জন্য) ---
+linux/flutter/ephemeral/
+macos/Flutter/ephemeral/
+
+# Flutter generated
+**/generated_plugin_registrant.dart
+.flutter-plugins
+.flutter-plugins-dependencies
+.metadata
+
+# OS
+.DS_Store
+Thumbs.db
