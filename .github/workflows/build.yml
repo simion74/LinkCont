@@ -49,7 +49,11 @@ jobs:
   # ================= WINDOWS (কম্পিউটার) =================
   build-windows:
     name: Build Windows EXE
-    runs-on: windows-latest
+    # windows-latest মানে GitHub সবসময় সবচেয়ে নতুন/প্রিভিউ Visual Studio
+    # টুলসেট ব্যবহার করে — এটাই flutter_assemble বিল্ড স্টেপ ভেঙে দিচ্ছিল
+    # (MSB8066)। windows-2022 = স্থিতিশীল VS2022 টুলসেট, Flutter-এর সাথে
+    # নির্ভরযোগ্যভাবে কাজ করে।
+    runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
 
