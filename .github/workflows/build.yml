@@ -24,8 +24,13 @@ jobs:
           distribution: "temurin"
           java-version: "17"
 
+      # নির্দিষ্ট ভার্সন পিন করা হলো (আগে 'stable' channel ছিল, যেটা প্রতিবার
+      # রান হওয়ার সময় সবচেয়ে নতুন Flutter টেনে আনতো — ফলে প্রতিবার নতুন
+      # Gradle/AGP/Kotlin দাবি করে বিল্ড ভেঙে যাচ্ছিল। এখন একটা নির্দিষ্ট,
+      # টেস্ট-করা ভার্সনে আটকে রাখা হলো যাতে বিল্ড স্থিতিশীল থাকে)
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: "3.44.7"
           channel: "stable"
           cache: true
 
@@ -57,8 +62,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # নির্দিষ্ট ভার্সন পিন করা হলো (আগে 'stable' channel ছিল, যেটা প্রতিবার
+      # রান হওয়ার সময় সবচেয়ে নতুন Flutter টেনে আনতো — ফলে প্রতিবার নতুন
+      # Gradle/AGP/Kotlin দাবি করে বিল্ড ভেঙে যাচ্ছিল। এখন একটা নির্দিষ্ট,
+      # টেস্ট-করা ভার্সনে আটকে রাখা হলো যাতে বিল্ড স্থিতিশীল থাকে)
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: "3.44.7"
           channel: "stable"
           cache: true
 
