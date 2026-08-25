@@ -18,11 +18,13 @@ pluginManagement {
 
 plugins {
     id "dev.flutter.flutter-plugin-loader" version "1.0.0"
-    // Gradle 8.14+ প্রয়োজন হওয়ায় AGP/Kotlin-ও সামঞ্জস্যপূর্ণ নতুন ভার্সনে
-    // আপগ্রেড করা হয়েছে (৮.x লাইনেই আছে, তাই AGP 9-এর নতুন DSL migration
-    // লাগবে না — বিদ্যমান build.gradle অপরিবর্তিত থাকবে)
-    id "com.android.application" version "8.12.0" apply false
-    id "org.jetbrains.kotlin.android" version "2.1.20" apply false
+    // Flutter-এর বর্তমান stable ভার্সন এখন সর্বনিম্ন Gradle 9.1.0, AGP 9.0.1,
+    // Kotlin 2.2.20 চায় (আগেরবার AGP 8.x-এ রেখেছিলাম, কিন্তু Flutter-এর
+    // 'stable' চ্যানেল এগিয়ে যাওয়ায় সেটা আর যথেষ্ট না — তাই এবার AGP 9-এ
+    // আপগ্রেড করা হলো, সাথে নিচে gradle.properties-এ android.newDsl=false
+    // দিয়ে পুরনো DSL-স্টাইল build.gradle অপরিবর্তিত রেখেই কাজ চালানো হচ্ছে)
+    id "com.android.application" version "9.0.1" apply false
+    id "org.jetbrains.kotlin.android" version "2.2.20" apply false
 }
 
 include ":app"
