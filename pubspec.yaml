@@ -9,7 +9,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_webrtc: ^0.11.7      # WebRTC পিয়ার কানেকশন, স্ক্রিন-ক্যাপচার স্ট্রিম হ্যান্ডলিং
+  # আগে ^0.11.7 ছিল — এই পুরনো ভার্সনের Android কোড Flutter-এর অনেক আগেই সরিয়ে
+  # ফেলা v1 embedding API (PluginRegistry.Registrar) ব্যবহার করত, তাই বর্তমান
+  # Flutter-এ কম্পাইলই হচ্ছিল না ("cannot find symbol: class Registrar")।
+  # ^1.6.0 এই সমস্যা নেই এমন সাম্প্রতিক, স্থিতিশীল ভার্সন।
+  flutter_webrtc: ^1.6.0      # WebRTC পিয়ার কানেকশন, স্ক্রিন-ক্যাপচার স্ট্রিম হ্যান্ডলিং
   web_socket_channel: ^2.4.0   # শুধু signaling-এর জন্য (SDP/ICE পাস করাতে)
   permission_handler: ^11.3.0
   shared_preferences: ^2.2.3  # ফোনে স্থায়ী ইউনিক আইডি সেভ রাখতে
