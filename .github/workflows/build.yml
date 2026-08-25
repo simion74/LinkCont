@@ -82,8 +82,12 @@ jobs:
       - name: Enable Windows desktop support
         run: flutter config --enable-windows-desktop
 
-      - name: Build Windows (release)
-        run: flutter build windows --release
+      # -v (verbose) যোগ করা হলো — MSB8066 শুধু "একটা স্টেপ ফেইল করেছে" বলে,
+      # আসল কারণ (কোন Dart/প্লাগইন ফাইলে সমস্যা) ডিফল্ট মোডে দেখায় না।
+      # verbose মোডে Flutter তার ভেতরের সব স্টেপ প্রিন্ট করবে, তাই আসল
+      # এররটা এবার লগে দেখা যাবে।
+      - name: Build Windows (release, verbose)
+        run: flutter build windows --release -v
 
       # পুরো Release ফোল্ডার (exe + দরকারি .dll + data) একটা zip-এ — এটাই
       # ব্যবহারকারীকে দেওয়ার মতো ইনস্টলযোগ্য বান্ডেল
