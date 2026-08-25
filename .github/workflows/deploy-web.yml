@@ -13,6 +13,9 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  # Pages প্রথমবার স্বয়ংক্রিয়ভাবে চালু করতে (configure-pages এর
+  # enablement: true) admin-লেভেল পারমিশন লাগে
+  administration: write
 
 concurrency:
   group: "pages"
@@ -47,7 +50,12 @@ jobs:
       - name: Build web (release)
         run: flutter build web --release --base-href "/${{ github.event.repository.name }}/"
 
+      # enablement: true দিলে Pages প্রথমবার এখনো ম্যানুয়ালি চালু করা না থাকলেও
+      # ওয়ার্কফ্লো নিজেই এটা চালু করার চেষ্টা করবে (আগে এই লাইন ছাড়া এরর
+      # আসছিল: "Get Pages site failed... repository has Pages enabled")
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:
