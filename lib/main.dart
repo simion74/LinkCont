@@ -292,7 +292,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Text(
                     'REMOTE ACCESS PLATFORM',
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.55),
+                      color: Colors.white.withOpacity(0.55),
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 2.2,
@@ -329,7 +329,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           const SizedBox(height: 14),
-          Container(height: 1, color: Colors.white.withValues(alpha: 0.10)),
+          Container(height: 1, color: Colors.white.withOpacity(0.10)),
           const SizedBox(height: 8),
 
           // ----- হিরো সেকশন: বাঁয়ে কন্টেন্ট, ডানে ইলাস্ট্রেশন -----
@@ -361,7 +361,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             'the same WiFi/LAN for a direct local connection — '
                             'fast, simple, and secure.',
                             style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.72),
+                              color: Colors.white.withOpacity(0.72),
                               fontSize: 15,
                               height: 1.5,
                             ),
@@ -469,12 +469,12 @@ class _NavBarItem extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, color: Colors.white.withValues(alpha: 0.85), size: 18),
+                Icon(icon, color: Colors.white.withOpacity(0.85), size: 18),
                 const SizedBox(width: 6),
                 Text(
                   label,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.85),
+                    color: Colors.white.withOpacity(0.85),
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
@@ -720,7 +720,7 @@ class _HostScreenState extends State<HostScreen> {
                           'Other network interfaces: '
                           '${_localAddresses.skip(1).join(", ")}',
                           style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.6),
+                              color: Colors.white.withOpacity(0.6),
                               fontSize: 12),
                         ),
                       ),
@@ -741,12 +741,12 @@ class _HostScreenState extends State<HostScreen> {
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                                 colors: [
-                                  Colors.white.withValues(alpha: 0.16),
-                                  Colors.white.withValues(alpha: 0.04),
+                                  Colors.white.withOpacity(0.16),
+                                  Colors.white.withOpacity(0.04),
                                 ],
                               ),
                               border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.25),
+                                color: Colors.white.withOpacity(0.25),
                                 width: 1,
                               ),
                             ),
@@ -758,7 +758,7 @@ class _HostScreenState extends State<HostScreen> {
                                   height: 46,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: Colors.white.withValues(alpha: 0.14),
+                                    color: Colors.white.withOpacity(0.14),
                                   ),
                                   child: const Icon(Icons.warning_amber,
                                       color: Colors.white, size: 26),
@@ -778,7 +778,7 @@ class _HostScreenState extends State<HostScreen> {
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                       color:
-                                          Colors.white.withValues(alpha: 0.75),
+                                          Colors.white.withOpacity(0.75),
                                       fontSize: 13),
                                 ),
                                 const SizedBox(height: 16),
