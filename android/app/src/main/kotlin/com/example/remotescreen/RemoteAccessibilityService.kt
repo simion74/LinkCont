@@ -72,7 +72,11 @@ class RemoteAccessibilityService : AccessibilityService() {
     /** ছোট ছোট swipe দিয়ে স্ক্রল সিমুলেট করা হয় (deltaY অনুযায়ী উপরে/নিচে) */
     fun scroll(xPercent: Double, yPercent: Double, deltaY: Double) {
         val (x, y) = px(xPercent, yPercent)
-        val endY = (y - (deltaY * 3)).coerceIn(0f, screenH.toFloat())
+        // deltaY (Double) * 3 কে .toFloat() দিয়ে আগেই Float বানিয়ে নেওয়া হচ্ছে,
+        // যাতে Float - Float (y) হয় এবং coerceIn(0f, ...)/lineTo()-এর Float
+        // প্যারামিটারের সাথে টাইপ মিলে যায় (নতুন Kotlin ভার্সনে Float/Double
+        // implicit mixing আর চলে না — strict type check করে)
+        val endY = (y - (deltaY * 3).toFloat()).coerceIn(0f, screenH.toFloat())
         val path = Path().apply { moveTo(x, y); lineTo(x, endY) }
         val stroke = GestureDescription.StrokeDescription(path, 0, 80)
         dispatchGesture(GestureDescription.Builder().addStroke(stroke).build(), null, null)
