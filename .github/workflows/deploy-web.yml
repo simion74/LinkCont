@@ -13,9 +13,6 @@ permissions:
   contents: read
   pages: write
   id-token: write
-  # Pages প্রথমবার স্বয়ংক্রিয়ভাবে চালু করতে (configure-pages এর
-  # enablement: true) admin-লেভেল পারমিশন লাগে
-  administration: write
 
 concurrency:
   group: "pages"
