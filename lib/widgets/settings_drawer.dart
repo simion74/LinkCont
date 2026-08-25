@@ -114,13 +114,13 @@ class _SettingsDrawerState extends State<SettingsDrawer> {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  const Color(0xFF102A52).withValues(alpha: 0.97),
-                  const Color(0xFF0B3B33).withValues(alpha: 0.98),
+                  const Color(0xFF102A52).withOpacity(0.97),
+                  const Color(0xFF0B3B33).withOpacity(0.98),
                 ],
               ),
               border: Border(
                 left: BorderSide(
-                    color: Colors.white.withValues(alpha: 0.10), width: 1),
+                    color: Colors.white.withOpacity(0.10), width: 1),
               ),
             ),
             child: !_loaded
@@ -277,9 +277,9 @@ class _Header extends StatelessWidget {
             height: 48,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: const Color(0xFF3ED67A).withValues(alpha: 0.15),
+              color: const Color(0xFF3ED67A).withOpacity(0.15),
               border: Border.all(
-                  color: const Color(0xFF3ED67A).withValues(alpha: 0.6)),
+                  color: const Color(0xFF3ED67A).withOpacity(0.6)),
             ),
             child: const Icon(Icons.settings_outlined,
                 color: Colors.white, size: 24),
@@ -333,7 +333,7 @@ class _SectionLabel extends StatelessWidget {
       child: Text(
         label.toUpperCase(),
         style: TextStyle(
-          color: Colors.white.withValues(alpha: 0.4),
+          color: Colors.white.withOpacity(0.4),
           fontSize: 11,
           fontWeight: FontWeight.w700,
           letterSpacing: 1,

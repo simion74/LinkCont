@@ -132,9 +132,9 @@ class _GlassGlowButtonState extends State<GlassGlowButton>
                       end: Alignment.bottomRight,
                       colors: [
                         Color.lerp(Colors.white, widget.glowColor, 0.35)!
-                            .withValues(alpha: widget.fillOpacity + 0.10),
+                            .withOpacity(widget.fillOpacity + 0.10),
                         Color.lerp(Colors.white, widget.glowColor, 0.35)!
-                            .withValues(alpha: widget.fillOpacity * 0.4),
+                            .withOpacity(widget.fillOpacity * 0.4),
                       ],
                     ),
                   ),
@@ -145,9 +145,9 @@ class _GlassGlowButtonState extends State<GlassGlowButton>
                         height: 42,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: widget.glowColor.withValues(alpha: 0.16),
+                          color: widget.glowColor.withOpacity(0.16),
                           border: Border.all(
-                            color: widget.glowColor.withValues(alpha: 0.75),
+                            color: widget.glowColor.withOpacity(0.75),
                             width: 1.4,
                           ),
                         ),
@@ -165,7 +165,7 @@ class _GlassGlowButtonState extends State<GlassGlowButton>
                         ),
                       ),
                       Icon(Icons.chevron_right,
-                          color: Colors.white.withValues(alpha: 0.85)),
+                          color: Colors.white.withOpacity(0.85)),
                     ],
                   ),
                 ),
@@ -205,15 +205,15 @@ class _GlowBorderPainter extends CustomPainter {
     final basePaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = baseWidth
-      ..color = color.withValues(alpha: 0.45);
+      ..color = color.withOpacity(0.45);
     canvas.drawRRect(rrect, basePaint);
 
     // Rotating glow — change glowWidth to make it thicker/thinner
     final sweep = SweepGradient(
       colors: [
-        color.withValues(alpha: 0.0),
-        color.withValues(alpha: 1.0),
-        color.withValues(alpha: 0.0),
+        color.withOpacity(0.0),
+        color.withOpacity(1.0),
+        color.withOpacity(0.0),
       ],
       stops: const [0.0, 0.12, 0.28],
       transform: GradientRotation(progress * 2 * math.pi),
@@ -319,9 +319,9 @@ class _IdDisplayCardState extends State<IdDisplayCard>
                   end: Alignment.bottomRight,
                   colors: [
                     Color.lerp(Colors.white, widget.glowColor, 0.35)!
-                        .withValues(alpha: 0.22),
+                        .withOpacity(0.22),
                     Color.lerp(Colors.white, widget.glowColor, 0.35)!
-                        .withValues(alpha: 0.06),
+                        .withOpacity(0.06),
                   ],
                 ),
               ),
@@ -332,9 +332,9 @@ class _IdDisplayCardState extends State<IdDisplayCard>
                     height: 42,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: widget.glowColor.withValues(alpha: 0.16),
+                      color: widget.glowColor.withOpacity(0.16),
                       border: Border.all(
-                        color: widget.glowColor.withValues(alpha: 0.75),
+                        color: widget.glowColor.withOpacity(0.75),
                         width: 1.4,
                       ),
                     ),
@@ -409,7 +409,7 @@ class _CopyTapIconState extends State<_CopyTapIcon>
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: widget.glowColor.withValues(alpha: 0.16),
+            color: widget.glowColor.withOpacity(0.16),
           ),
           child: const Icon(Icons.copy_rounded, color: Colors.white, size: 18),
         ),
@@ -483,13 +483,13 @@ class _GlassCircleIconButtonState extends State<GlassCircleIconButton>
                     end: Alignment.bottomRight,
                     colors: [
                       Color.lerp(Colors.white, widget.glowColor, 0.35)!
-                          .withValues(alpha: 0.22),
+                          .withOpacity(0.22),
                       Color.lerp(Colors.white, widget.glowColor, 0.35)!
-                          .withValues(alpha: 0.06),
+                          .withOpacity(0.06),
                     ],
                   ),
                   border: Border.all(
-                    color: widget.glowColor.withValues(alpha: 0.6),
+                    color: widget.glowColor.withOpacity(0.6),
                     width: 1.2,
                   ),
                 ),
@@ -556,7 +556,7 @@ class _TopIconButtonState extends State<TopIconButton>
             size: 26,
             shadows: [
               Shadow(
-                  color: Colors.black.withValues(alpha: 0.35), blurRadius: 6),
+                  color: Colors.black.withOpacity(0.35), blurRadius: 6),
             ],
           ),
         ),

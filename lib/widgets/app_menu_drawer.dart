@@ -26,13 +26,13 @@ class AppMenuDrawer extends StatelessWidget {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  const Color(0xFF102A52).withValues(alpha: 0.97),
-                  const Color(0xFF0B3B33).withValues(alpha: 0.98),
+                  const Color(0xFF102A52).withOpacity(0.97),
+                  const Color(0xFF0B3B33).withOpacity(0.98),
                 ],
               ),
               border: Border(
                 right: BorderSide(
-                    color: Colors.white.withValues(alpha: 0.10), width: 1),
+                    color: Colors.white.withOpacity(0.10), width: 1),
               ),
             ),
             child: SafeArea(
@@ -48,12 +48,12 @@ class AppMenuDrawer extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.94),
+                            color: Colors.white.withOpacity(0.94),
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
                                 color: const Color(0xFF12DAA2)
-                                    .withValues(alpha: 0.35),
+                                    .withOpacity(0.35),
                                 blurRadius: 14,
                                 spreadRadius: 1,
                               ),
