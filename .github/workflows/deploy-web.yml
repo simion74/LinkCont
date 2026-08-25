@@ -1,10 +1,13 @@
 name: Deploy Flutter Web Preview to GitHub Pages
 
-# main/master ব্রাঞ্চে পুশ করলেই স্বয়ংক্রিয়ভাবে চলবে
+# শুধু UI/ডিজাইন প্রিভিউ দেখার জন্য একটা শেয়ারযোগ্য লাইভ লিংক — main
+# ব্রাঞ্চে push হলেই অটো আপডেট হবে। স্ক্রিন-শেয়ার/রিমোট-কন্ট্রোলের আসল
+# ফাংশনালিটি এখানে কাজ করবে না (সেগুলো Android/Windows-স্পেসিফিক নেটিভ
+# ফিচার) — এটা শুধু লে-আউট/ডিজাইন দেখার জন্য।
 on:
   push:
-    branches: [main, master]
-  workflow_dispatch: # চাইলে GitHub-এর Actions ট্যাব থেকে ম্যানুয়ালিও রান করা যাবে
+    branches: [main]
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -18,19 +21,33 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
+      # build.yml (APK/Windows) এর সাথে সামঞ্জস্য রাখতে এখানেও একই ভার্সন
+      # পিন করা হলো — 'stable' channel প্রতিবার এগিয়ে যাওয়ায় মাঝে মাঝে
+      # অপ্রত্যাশিতভাবে নতুন টুলচেইন দাবি করছিল
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.0'
-          channel: 'stable'
+          flutter-version: "3.44.7"
+          channel: "stable"
+          cache: true
 
-      - run: flutter pub get
+      - name: Install dependencies
+        run: flutter pub get
 
-      # রিপোর নাম অনুযায়ী base-href সেট করা হচ্ছে (GitHub Pages সাব-পাথে হোস্ট
-      # করে, যেমন username.github.io/LinkCont/) — নাহলে CSS/JS লোড হবে না
-      - run: flutter build web --release --base-href "/${{ github.event.repository.name }}/"
+      - name: Enable web support
+        run: flutter config --enable-web
+
+      # GitHub Pages প্রজেক্ট-পেজ হিসেবে সার্ভ হয় (https://<user>.github.io/<repo>/),
+      # তাই base-href রিপোর নাম দিয়ে সেট করতে হয় — নাহলে CSS/JS/asset লোড হবে না
+      - name: Build web (release)
+        run: flutter build web --release --base-href "/${{ github.event.repository.name }}/"
+
+      - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
         with:
