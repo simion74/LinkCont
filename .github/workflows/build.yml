@@ -73,9 +73,16 @@ jobs:
       # directory" এররটার এটাই সবচেয়ে সম্ভাব্য কারণ। ক্যাশ বন্ধ করে দিলে
       # প্রতিবার সম্পূর্ণ, ঠিকঠাক Flutter SDK ডাউনলোড হবে (একটু ধীর হবে,
       # কিন্তু নির্ভরযোগ্য)।
+      # ⚠️ পরীক্ষামূলকভাবে পুরনো ভার্সনে পিন করা হলো — 3.44.7-এ প্রতিটা CI রানে
+      # ফ্রেশ ক্লিনের পরও একই MSB8066 "items cannot be built in parallel" এরর
+      # আসছিল (windows/flutter/CMakeLists.txt-এর flutter_windows.dll মাল্টি-আউটপুট
+      # custom_command থেকে VS-generator দুটো ভিন্ন-কেসের rule জেনারেট করে ফেলছিল)।
+      # এটা নতুন Flutter ভার্সনের CMake রিফ্যাক্টরের (windows/x64 subdir) সাথে সম্পর্কিত
+      # রিগ্রেশন কিনা যাচাই করতে পুরনো stable ভার্সনে টেস্ট করা হচ্ছে। কাজ না করলে
+      # এই লাইনটা আবার 3.44.7-এ ফেরত দিতে হবে (বা অন্য ভার্সনে চেষ্টা করতে হবে)।
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.44.7"
+          flutter-version: "3.24.5"
           channel: "stable"
           cache: false
 
@@ -89,11 +96,6 @@ jobs:
       - name: Enable Windows desktop support
         run: flutter config --enable-windows-desktop
 
-      # আগে "no such file or directory" এরর আসছিল flutter_windows.dll কপি
-      # করার সময় — কারণ ক্যাশ করা Flutter SDK-তে Windows ইঞ্জিনের আর্টিফ্যাক্ট
-      # ঠিকমতো ছিল না (আমরা কয়েকবার Flutter ভার্সন বদলানোর ফলে ক্যাশ
-      # অসামঞ্জস্যপূর্ণ হয়ে গিয়েছিল)। precache জোর করে এগুলো আবার
-      # ডাউনলোড/ভেরিফাই করবে বিল্ড শুরুর আগেই।
       - name: Precache Windows engine artifacts
         run: flutter precache --windows --force
 
