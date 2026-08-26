@@ -4,10 +4,11 @@ import 'package:flutter/material.dart';
 /// স্ক্রিনেই ব্যবহার করা যাবে, শুধু স্ক্রিনের সাইজ/অরিয়েন্টেশন দেখে সঠিক ছবিটা
 /// (mobileAsset বা tvPcAsset) নিজে থেকেই বেছে নেয়।
 ///
-/// ডিফল্টভাবে HomeScreen ছাড়া বাকি "ভেতরের" পেজগুলোর (Host/Viewer ইত্যাদি)
-/// জন্য assets/image/screen_frem.webp (মোবাইল) এবং assets/image/pc_tv_frem.webp
-/// (টিভি/কম্পিউটার) ব্যবহার হয়। HomeScreen নিজের mobileAsset হিসেবে
-/// assets/image/bg_frem.webp পাস করে দেয় (নিচে main.dart দ্রষ্টব্য)।
+/// ⚠️ আগে ডিফল্ট mobileAsset ছিল assets/image/screen_frem.webp — সেই ফাইলটা
+/// ডিলিট হয়ে গেছে (আর pubspec.yaml-এর assets তালিকাতেও নেই), তাই ডিফল্ট
+/// bg_frem.webp-তে পরিবর্তন করা হলো (এটাই এখন একমাত্র মোবাইল ব্যাকগ্রাউন্ড
+/// ছবি যেটা আসলে আছে) — নাহলে Host/Viewer স্ক্রিন যেগুলো mobileAsset
+/// ওভাররাইড না করে ব্যবহার করে, সেগুলোতে asset-not-found এরর হতো।
 ///
 /// ব্যবহার:
 /// return Scaffold(
@@ -23,7 +24,7 @@ class ScreenBackground extends StatelessWidget {
   const ScreenBackground({
     super.key,
     required this.child,
-    this.mobileAsset = 'assets/image/screen_frem.webp',
+    this.mobileAsset = 'assets/image/bg_frem.webp',
     this.tvPcAsset = 'assets/image/pc_tv_frem.webp',
   });
 
