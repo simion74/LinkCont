@@ -1,5 +1,5 @@
 name: linkcont
-description: LinkCont — P2P live screen share + remote control (Connect, Share, Control)
+description: LinkCont — P2P live screen share + voice + remote control between Android devices (mobile, tablet, TV)
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -9,12 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # আগে ^0.11.7 ছিল — এই পুরনো ভার্সনের Android কোড Flutter-এর অনেক আগেই সরিয়ে
-  # ফেলা v1 embedding API (PluginRegistry.Registrar) ব্যবহার করত, তাই বর্তমান
-  # Flutter-এ কম্পাইলই হচ্ছিল না ("cannot find symbol: class Registrar")।
-  # ^1.6.0 এই সমস্যা নেই এমন সাম্প্রতিক, স্থিতিশীল ভার্সন।
   flutter_webrtc: ^1.6.0      # WebRTC পিয়ার কানেকশন, স্ক্রিন-ক্যাপচার স্ট্রিম হ্যান্ডলিং
-  web_socket_channel: ^2.4.0   # শুধু signaling-এর জন্য (SDP/ICE পাস করাতে)
+  web_socket_channel: ^2.4.0   # শুধু signaling-এর জন্য (call-request/SDP/ICE পাস করাতে)
   permission_handler: ^11.3.0
   shared_preferences: ^2.2.3  # ফোনে স্থায়ী ইউনিক আইডি সেভ রাখতে
   share_plus: ^10.1.2  # আইডি মেইল/হোয়াটসঅ্যাপ/অন্য অ্যাপ দিয়ে শেয়ার করতে
@@ -27,11 +23,12 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  # ⚠️ এই তালিকা assets/image/ ফোল্ডারের আসল ফাইলগুলোর সাথে মিলিয়ে ঠিক
+  # করা হয়েছে (screen_frem.webp আর computer_icon.webp ডিলিট হয়ে গিয়েছিল,
+  # আর desing_icon.webp বানান ঠিক করে design_icon.webp হয়েছে)।
   assets:
     - assets/image/bg_frem.webp
-    - assets/image/screen_frem.webp
     - assets/image/pc_tv_frem.webp
-    - assets/image/desing_icon.webp
+    - assets/image/design_icon.webp
     - assets/image/icon.webp
-    - assets/image/computer_icon.webp
     - assets/image/software_icon.webp
