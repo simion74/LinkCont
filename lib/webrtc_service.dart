@@ -4,9 +4,14 @@ import 'signaling.dart';
 
 /// ভিডিও (স্ক্রিন শেয়ার) এবং রিমোট-কন্ট্রোল ইভেন্ট (DataChannel দিয়ে) দুটোই
 /// একই RTCPeerConnection-এর মধ্য দিয়ে সরাসরি P2P যায় — signaling server শুধু
-/// শুরুতে হ্যান্ডশেক করিয়ে দেয়, এরপর তার কোনো ভূমিকা থাকে না।
+/// শুরুতে হ্যান্ডশেক করিয়ে দেয় (call-request/accept-এর পর SDP/ICE পাস করানো),
+/// এরপর তার কোনো ভূমিকা থাকে না।
+///
+/// isHost: true হলে এই ডিভাইস স্ক্রিন শেয়ার করছে (call-request accept
+/// করেছে এমন পাশ)। false হলে এই ডিভাইস অন্যের স্ক্রিন দেখছে/কন্ট্রোল
+/// করছে (যে call-request পাঠিয়েছিল সেই পাশ)।
 class WebRTCService {
-  final SignalingBase signaling;
+  final SignalingClient signaling;
   final bool isHost;
 
   RTCPeerConnection? _pc;
@@ -30,6 +35,7 @@ class WebRTCService {
 
     _pc!.onIceCandidate = (candidate) {
       // ICE candidate signaling দিয়ে পাঠানো হচ্ছে (শুধু নেটওয়ার্ক ঠিকানা, ভিডিও ডেটা না)
+      if (candidate.candidate == null) return;
       signaling.sendSignal(_remotePeerId ?? '', {
         'candidate': candidate.toMap(),
       });
@@ -82,6 +88,7 @@ class WebRTCService {
   }
 
   Future<void> handleRemoteSignal(Map<String, dynamic> data) async {
+    if (_pc == null) return; // এখনো peer connection তৈরি হয়নি (রেসের বিরুদ্ধে সুরক্ষা)
     if (data.containsKey('sdp')) {
       final sdpMap = data['sdp'];
       final desc = RTCSessionDescription(sdpMap['sdp'], sdpMap['type']);
@@ -114,6 +121,8 @@ class WebRTCService {
     }
   }
 
+  /// শুধু এই সেশনের P2P কানেকশন বন্ধ করে — signaling ক্লায়েন্ট বন্ধ করে না,
+  /// কারণ সেটা HomeScreen-এর মালিকানায়, পুরো অ্যাপ চলাকালীন খোলা থাকা দরকার।
   Future<void> dispose() async {
     await _localScreenStream?.dispose();
     await _controlChannel?.close();

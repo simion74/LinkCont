@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -13,11 +14,6 @@ import 'widgets/screen_background.dart';
 import 'widgets/settings_drawer.dart';
 import 'widgets/app_menu_drawer.dart';
 import 'widgets/linkcont_logo.dart';
-import 'local_signaling_server.dart';
-
-/// Host/Viewer দুটো স্ক্রিনেই ব্যবহৃত — ইন্টারনেট আইডি দিয়ে (কেন্দ্রীয় signaling
-/// সার্ভার) নাকি একই WiFi/LAN নেটওয়ার্কে সরাসরি IP দিয়ে কানেক্ট হবে
-enum ConnectMode { internetId, localIp }
 
 /// Persistent unique ID for this phone — generated once and stored in
 /// SharedPreferences, so it stays the same across app restarts.
@@ -32,14 +28,14 @@ Future<String> getOrCreateDeviceId() async {
   return id;
 }
 
-// Put your own signaling server address here (the Node.js server.js you deploy)
+// এখানে আপনার signaling সার্ভারের ঠিকানা বসবে (এখনো বসানো হয়নি —
+// PROTOCOL.md দেখুন সার্ভারটা ঠিক কী মেসেজ-কনট্র্যাক্ট মানতে হবে তার জন্য)
 const String kSignalingUrl = 'wss://YOUR-SIGNALING-SERVER.example.com';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // পুরো অ্যাপ ডিফল্টভাবে পোর্ট্রেট — Home/Host screen-এর ব্যাকগ্রাউন্ড/UI
-  // পোর্ট্রেটের জন্য বানানো। শুধু ViewerScreen (যেখানে অন্য ডিভাইসের স্ক্রিন
-  // দেখা যায়) প্রয়োজনে নিজে থেকে ল্যান্ডস্কেপ অনুমতি দেবে — নিচে দেখুন।
+  // পুরো অ্যাপ পোর্ট্রেট — শুধু লাইভ-ভিউ স্ক্রিন (অন্য ডিভাইসের স্ক্রিন
+  // দেখার সময়) প্রয়োজনে নিজে থেকে ল্যান্ডস্কেপ অনুমতি দেবে।
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
@@ -53,13 +49,18 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'LinkCont',
-      debugShowCheckedModeBanner: false, // hide the red "DEBUG" ribbon
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.indigo),
       home: const HomeScreen(),
     );
   }
 }
 
+// ================= HOME SCREEN =================
+// এখন এটাই একমাত্র "হাব" স্ক্রিন — এখানেই signaling কানেকশন সারা অ্যাপ
+// চলাকালীন (foreground-এ থাকা অবস্থায়) খোলা থাকে, যাতে অ্যাপের যেকোনো
+// জায়গায় থাকলেও ইনকামিং কল-রিকোয়েস্ট ধরা যায়। HostScreen/ViewerScreen
+// এখন শুধু এই একই SignalingClient ধার নিয়ে সাময়িকভাবে খোলে।
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
   @override
@@ -68,13 +69,123 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String? _deviceId;
-  // মেনু/সেটিংস আইকন থেকে Scaffold-এর drawer/endDrawer খুলতে এই key ব্যবহার হয়
   final _scaffoldKey = GlobalKey<ScaffoldState>();
+  final _targetIdController = TextEditingController();
+
+  late final SignalingClient _signaling;
+  StreamSubscription<SignalingEvent>? _sub;
+
+  // আমি নিজে যাকে রিকোয়েস্ট পাঠিয়েছি, তার জবাবের অপেক্ষায় আছি কিনা
+  bool _calling = false;
+  String? _callingTargetId;
 
   @override
   void initState() {
     super.initState();
-    getOrCreateDeviceId().then((id) => setState(() => _deviceId = id));
+    _signaling = SignalingClient(kSignalingUrl);
+    _sub = _signaling.events.listen(_handleEvent);
+    getOrCreateDeviceId().then((id) {
+      setState(() => _deviceId = id);
+      _signaling.connect(id);
+    });
+  }
+
+  void _handleEvent(SignalingEvent event) {
+    if (!mounted) return;
+    switch (event) {
+      case IncomingRequestEvent(:final fromId):
+        _showIncomingRequestDialog(fromId);
+        break;
+
+      case RequestAcceptedEvent(:final fromId):
+        if (!_calling || _callingTargetId != fromId) return;
+        setState(() {
+          _calling = false;
+          _callingTargetId = null;
+        });
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ViewerScreen(signaling: _signaling, peerId: fromId),
+          ),
+        );
+        break;
+
+      case RequestRejectedEvent(:final fromId):
+        if (_callingTargetId == fromId) {
+          setState(() {
+            _calling = false;
+            _callingTargetId = null;
+          });
+          _snack('Request declined');
+        }
+        break;
+
+      case PeerOfflineEvent(:final targetId):
+        if (_callingTargetId == targetId) {
+          setState(() {
+            _calling = false;
+            _callingTargetId = null;
+          });
+          _snack('This ID is not online right now');
+        }
+        break;
+
+      case SignalingErrorEvent(:final message):
+        _snack(message);
+        break;
+
+      default:
+        // SignalDataEvent / PeerLeftEvent / RegisteredEvent — HomeScreen-এর
+        // কিছু করার নেই, চলমান সেশন স্ক্রিন থাকলে সেটা নিজে শুনছে।
+        break;
+    }
+  }
+
+  void _snack(String text) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  // কেউ আমার স্ক্রিন দেখতে/কন্ট্রোল করতে চাইলে এই ডায়ালগ দেখানো হয়
+  void _showIncomingRequestDialog(String fromId) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0B2036),
+        title: const Text('Incoming request',
+            style: TextStyle(color: Colors.white)),
+        content: Text(
+          'Device $fromId wants to view and control your screen.\n\n'
+          'Allow?',
+          style: const TextStyle(color: Colors.white70, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              _signaling.respondToRequest(fromId, false);
+              Navigator.pop(ctx);
+            },
+            child: const Text('Decline'),
+          ),
+          FilledButton(
+            onPressed: () {
+              _signaling.respondToRequest(fromId, true);
+              Navigator.pop(ctx);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      HostScreen(signaling: _signaling, peerId: fromId),
+                ),
+              );
+            },
+            child: const Text('Allow'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _copyId() {
@@ -90,18 +201,39 @@ class _HomeScreenState extends State<HomeScreen> {
     Share.share('My LinkCont ID: $_deviceId');
   }
 
-  // সেটিংস ড্রয়ার থেকে "Generate New ID" চাপলে কল হয় — পুরনো ID মুছে নতুন
-  // একটা বানিয়ে সেভ করে, home screen-এর কার্ডেও সাথে সাথে আপডেট হয়ে যায়
   Future<void> _regenerateId() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('device_id');
     final newId = await getOrCreateDeviceId();
     setState(() => _deviceId = newId);
+    // নতুন ID দিয়ে আবার register করতে হবে
+    _signaling.connect(newId);
   }
 
-  // ==== Move the button block up/down by changing these two flex numbers ====
-  // Increasing topGapFlex pushes buttons down, decreasing pushes them up.
-  // Increasing bottomGapFlex pushes buttons up (more empty space at the bottom).
+  void _connect() {
+    final target = _targetIdController.text.trim();
+    if (target.isEmpty) return;
+    if (_deviceId != null && target == _deviceId) {
+      _snack('You cannot connect to your own ID');
+      return;
+    }
+    setState(() {
+      _calling = true;
+      _callingTargetId = target;
+    });
+    _signaling.requestCall(target);
+  }
+
+  void _cancelCalling() {
+    if (_callingTargetId != null) {
+      _signaling.hangup(_callingTargetId!);
+    }
+    setState(() {
+      _calling = false;
+      _callingTargetId = null;
+    });
+  }
+
   static const int topGapFlex = 3;
   static const int bottomGapFlex = 1;
 
@@ -113,11 +245,13 @@ class _HomeScreenState extends State<HomeScreen> {
         title:
             const Text('How It Works', style: TextStyle(color: Colors.white)),
         content: const Text(
-          '1. Share your unique ID with the other device.\n'
-          '2. On the other device, tap "Screen View" and enter that ID.\n'
-          '3. Tap "Share Screen (Host)" to start sharing your screen and voice.\n'
-          '4. Grant the Accessibility permission on the host device to allow '
-          'remote control.',
+          '1. Share your unique ID with the other device (mobile, tablet, '
+          'or Android TV).\n'
+          '2. On the other device, enter that ID and tap Connect.\n'
+          '3. You\'ll get a prompt asking to allow screen access — tap '
+          'Allow to start sharing your screen, voice, and control.\n'
+          '4. Grant the Accessibility permission when asked, so the other '
+          'party can control your device (not just view it).',
           style: TextStyle(color: Colors.white70, height: 1.5),
         ),
         actions: [
@@ -130,15 +264,18 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
+  void dispose() {
+    _sub?.cancel();
+    _signaling.dispose();
+    _targetIdController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // বড় ল্যান্ডস্কেপ স্ক্রিন (টিভি/কম্পিউটার) হলে প্রিমিয়াম ওয়েবসাইট-স্টাইল
-    // লে-আউট, নাহলে আগের মোবাইল/ট্যাব লে-আউট — ScreenBackground যেভাবে
-    // ব্যাকগ্রাউন্ড ছবি বেছে নেয় সেই একই শর্ত ব্যবহার করা হচ্ছে যাতে দুটো
-    // সবসময় সিঙ্কে থাকে।
     final bool isWide = ScreenBackground.isTvOrPc(context);
     return Scaffold(
       key: _scaffoldKey,
-      // বাঁ পাশে হ্যামবার্গার মেনু, ডানপাশে সেটিংস — দুটোই আলাদা Drawer
       drawer: const AppMenuDrawer(),
       endDrawer: SettingsDrawer(
         deviceId: _deviceId,
@@ -146,8 +283,6 @@ class _HomeScreenState extends State<HomeScreen> {
         onRegenerateId: _regenerateId,
       ),
       body: ScreenBackground(
-        // HomeScreen মোবাইল/ট্যাবে bg_frem.webp দেখাবে, বড় ল্যান্ডস্কেপ
-        // স্ক্রিনে (টিভি/কম্পিউটার) স্বয়ংক্রিয়ভাবে pc_tv_frem.webp দেখাবে
         mobileAsset: 'assets/image/bg_frem.webp',
         child: SafeArea(
           child: isWide ? _buildWideLayout(context) : _buildCompactLayout(context),
@@ -159,7 +294,6 @@ class _HomeScreenState extends State<HomeScreen> {
   // ================= মোবাইল/ট্যাব (পোর্ট্রেট-স্টাইল) লে-আউট =================
   Widget _buildCompactLayout(BuildContext context) {
     return Padding(
-      // === Control the home screen buttons' side padding here ===
       padding: const EdgeInsets.symmetric(horizontal: 22),
       child: Column(
         children: [
@@ -177,10 +311,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          // ===== লোগো ছবি + ব্র্যান্ড ওয়ার্ডমার্ক + ইলাস্ট্রেশন =====
-          // logo.webp (assets/image/icon.webp) সবসময় "LinkCont" লেখার
-          // ঠিক আগে বসে — হোম স্ক্রিন, ড্রয়ার, সব জায়গায় একইভাবে।
-          // computer_icon.webp: ল্যাপটপ+ফোন কনসেপ্ট আর্ট (রেডিমেড ছবি)।
           Expanded(
             flex: topGapFlex,
             child: Column(
@@ -202,8 +332,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 4),
                 Expanded(
                   child: Center(
+                    // computer_icon.webp সরিয়ে design_icon.webp বসানো হলো —
+                    // এখন কম্পিউটার/PC কনসেপ্ট নেই, শুধু মোবাইল/ট্যাব/TV
                     child: Image.asset(
-                      'assets/image/computer_icon.webp',
+                      'assets/image/design_icon.webp',
                       fit: BoxFit.contain,
                     ),
                   ),
@@ -212,10 +344,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // ===== ID card (previously the "Registration" button) =====
-          // Tapping it doesn't navigate anywhere — only the copy icon
-          // on the right copies the ID. A separate share icon sits
-          // outside the card, to the right.
           Row(
             children: [
               Expanded(
@@ -225,8 +353,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   glowColor: const Color(0xFF3ED67A),
                   onCopy: _copyId,
                   borderRadius: 12,
-                  baseBorderWidth: 2.2, // static border — increase to thicken
-                  glowBorderWidth: 5, // rotating glow — increase to thicken
+                  baseBorderWidth: 2.2,
+                  glowBorderWidth: 5,
                 ),
               ),
               const SizedBox(width: 10),
@@ -239,41 +367,61 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
 
           const SizedBox(height: 16),
-          GlassGlowButton(
-            icon: Icons.screen_share_outlined,
-            label: 'Share Screen (Host)',
-            glowColor: const Color(0xFF4FC3F7),
-            borderRadius: 12,
-            onTap: () => Navigator.push(
-                context, MaterialPageRoute(builder: (_) => const HostScreen())),
+          // Host/Viewer আলাদা বাটন আর নেই — একটাই ইনপুট: অন্য ডিভাইসের ID
+          // দিলে Connect চাপলেই সেই ডিভাইসের কাছে অনুরোধ যাবে
+          TextField(
+            controller: _targetIdController,
+            style: const TextStyle(color: Colors.white),
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: "Enter the other device's ID",
+              labelStyle: TextStyle(color: Colors.white70),
+              enabledBorder: UnderlineInputBorder(
+                  borderSide: BorderSide(color: Colors.white54)),
+            ),
           ),
           const SizedBox(height: 16),
-          GlassGlowButton(
-            icon: Icons.visibility_outlined,
-            label: 'Screen View',
-            glowColor: const Color(0xFF4FC3F7),
-            borderRadius: 12,
-            onTap: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const ViewerScreen())),
-          ),
+          if (_calling)
+            Row(
+              children: [
+                Expanded(
+                  child: GlassGlowButton(
+                    icon: Icons.hourglass_top,
+                    label: 'Calling $_callingTargetId — waiting...',
+                    glowColor: const Color(0xFFFFC107),
+                    borderRadius: 12,
+                    onTap: () {}, // অপেক্ষার সময় কোনো অ্যাকশন নেই
+                  ),
+                ),
+                const SizedBox(width: 8),
+                GlassCircleIconButton(
+                  icon: Icons.close,
+                  glowColor: const Color(0xFFFF5252),
+                  onTap: _cancelCalling,
+                ),
+              ],
+            )
+          else
+            GlassGlowButton(
+              icon: Icons.login,
+              label: 'Connect',
+              glowColor: const Color(0xFF4FC3F7),
+              borderRadius: 12,
+              onTap: _connect,
+            ),
           const Spacer(flex: bottomGapFlex),
         ],
       ),
     );
   }
 
-  // ============ টিভি/কম্পিউটার (প্রশস্ত স্ক্রিন) — প্রিমিয়াম ওয়েবসাইট-স্টাইল লে-আউট ============
-  // উপরে: লোগো + "LinkCont" + ট্যাগলাইন, তারপর একটা হরাইজন্টাল মেনু-বার
-  // (উদাহারন.jpeg রেফারেন্স অনুযায়ী)। নিচে: হিরো সেকশন — বাঁয়ে টেক্সট + ID
-  // কার্ড + অ্যাকশন বাটন, ডানে ইলাস্ট্রেশন — যেন প্রিমিয়াম প্রোডাক্ট ওয়েবসাইটের
-  // মতো দেখায়, মোবাইল লে-আউট শুধু বড় স্ক্রিনে টেনে বড় করা না।
+  // ============ টিভি (প্রশস্ত স্ক্রিন) — প্রিমিয়াম লে-আউট ============
   Widget _buildWideLayout(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ----- হেডার: লোগো + ওয়ার্ডমার্ক (বাঁয়ে), মেনু-বার (ডানে) -----
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -315,7 +463,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: Icons.ios_share,
                 label: 'Share App',
                 onTap: () => Share.share(
-                    'Check out LinkCont — share your screen, voice, and control devices remotely!'),
+                    'Check out LinkCont — share your screen, voice, and control your Android devices remotely!'),
               ),
               const SizedBox(width: 4),
               TopIconButton(
@@ -331,8 +479,6 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 14),
           Container(height: 1, color: Colors.white.withOpacity(0.10)),
           const SizedBox(height: 8),
-
-          // ----- হিরো সেকশন: বাঁয়ে কন্টেন্ট, ডানে ইলাস্ট্রেশন -----
           Expanded(
             child: Center(
               child: ConstrainedBox(
@@ -347,7 +493,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'Share your screen.\nControl any device, anywhere.',
+                            'Share your screen.\nControl any Android device, anywhere.',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 34,
@@ -357,9 +503,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           const SizedBox(height: 14),
                           Text(
-                            'Connect instantly with your unique ID, or stay on '
-                            'the same WiFi/LAN for a direct local connection — '
-                            'fast, simple, and secure.',
+                            'Enter the other device\'s ID and connect instantly — '
+                            'they\'ll get a prompt to allow access. Fast, simple, secure.',
                             style: TextStyle(
                               color: Colors.white.withOpacity(0.72),
                               fontSize: 15,
@@ -389,36 +534,48 @@ class _HomeScreenState extends State<HomeScreen> {
                             ],
                           ),
                           const SizedBox(height: 20),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: GlassGlowButton(
-                                  icon: Icons.screen_share_outlined,
-                                  label: 'Share Screen (Host)',
-                                  glowColor: const Color(0xFF4FC3F7),
-                                  borderRadius: 12,
-                                  onTap: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                          builder: (_) => const HostScreen())),
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: GlassGlowButton(
-                                  icon: Icons.visibility_outlined,
-                                  label: 'Screen View',
-                                  glowColor: const Color(0xFF4FC3F7),
-                                  borderRadius: 12,
-                                  onTap: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                          builder: (_) =>
-                                              const ViewerScreen())),
-                                ),
-                              ),
-                            ],
+                          TextField(
+                            controller: _targetIdController,
+                            style: const TextStyle(color: Colors.white),
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: "Enter the other device's ID",
+                              labelStyle: TextStyle(color: Colors.white70),
+                              enabledBorder: UnderlineInputBorder(
+                                  borderSide:
+                                      BorderSide(color: Colors.white54)),
+                            ),
                           ),
+                          const SizedBox(height: 20),
+                          if (_calling)
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: GlassGlowButton(
+                                    icon: Icons.hourglass_top,
+                                    label:
+                                        'Calling $_callingTargetId — waiting...',
+                                    glowColor: const Color(0xFFFFC107),
+                                    borderRadius: 12,
+                                    onTap: () {},
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                GlassCircleIconButton(
+                                  icon: Icons.close,
+                                  glowColor: const Color(0xFFFF5252),
+                                  onTap: _cancelCalling,
+                                ),
+                              ],
+                            )
+                          else
+                            GlassGlowButton(
+                              icon: Icons.login,
+                              label: 'Connect',
+                              glowColor: const Color(0xFF4FC3F7),
+                              borderRadius: 12,
+                              onTap: _connect,
+                            ),
                         ],
                       ),
                     ),
@@ -426,7 +583,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Expanded(
                       flex: 4,
                       child: Image.asset(
-                        'assets/image/computer_icon.webp',
+                        'assets/image/design_icon.webp',
                         fit: BoxFit.contain,
                       ),
                     ),
@@ -441,8 +598,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-/// টিভি/কম্পিউটার হেডারের হরাইজন্টাল মেনু-বার আইটেম — হালকা আইকন + লেখা,
-/// হোভার/ট্যাপে subtle হাইলাইট (ওয়েবসাইট নেভিগেশনের মতো)।
 class _NavBarItem extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -488,109 +643,66 @@ class _NavBarItem extends StatelessWidget {
   }
 }
 
-// ================= HOST SCREEN =================
+// ================= HOST SESSION SCREEN =================
+// আগে এই স্ক্রিনটাই মোড বেছে "waiting for viewer" দেখাত। এখন এটা শুধু
+// তখনই খোলে যখন ইতিমধ্যে একটা call-request accept হয়ে গেছে (HomeScreen
+// থেকে peerId নিয়ে) — তাই সরাসরি হোস্টিং শুরু করে দেয়, কোনো মোড/অপেক্ষা নেই।
 class HostScreen extends StatefulWidget {
-  const HostScreen({super.key});
+  final SignalingClient signaling;
+  final String peerId; // যে ডিভাইস আমার স্ক্রিন দেখবে/কন্ট্রোল করবে
+
+  const HostScreen({super.key, required this.signaling, required this.peerId});
+
   @override
   State<HostScreen> createState() => _HostScreenState();
 }
 
 class _HostScreenState extends State<HostScreen> {
-  late SignalingBase _signaling;
   WebRTCService? _rtc;
-  String? _roomCode;
-  String _status = 'Generating ID...';
+  StreamSubscription<SignalingEvent>? _sub;
+  String _status = 'Starting...';
   bool _accessibilityOn = false;
-
-  // ডিফল্টভাবে ইন্টারনেট (আইডি) মোডে হোস্ট করে; ইউজার চাইলে টগল করে লোকাল
-  // নেটওয়ার্ক (IP) মোডে যেতে পারবে — কর্পোরেট/অফিস LAN-এ ইন্টারনেট signaling
-  // সার্ভার ছাড়াই সরাসরি IP দিয়ে কানেক্ট করানোর জন্য
-  ConnectMode _mode = ConnectMode.internetId;
-  List<String> _localAddresses = [];
 
   @override
   void initState() {
     super.initState();
     _checkAccessibility();
-    _startInternetMode();
+    _sub = widget.signaling.events.listen(_handleEvent);
+    _startHosting();
   }
 
-  // দুই মোডের signaling object-ই একই callback দিয়ে wire হয় — WebRTCService,
-  // accessibility control ফরওয়ার্ডিং সব অপরিবর্তিত থাকে, শুধু transport বদলায়
-  void _wireSignaling(SignalingBase s) {
-    s.onRoomCreated = (code) {
-      if (_mode != ConnectMode.internetId) return;
-      setState(() {
-        _roomCode = code;
-        _status = 'Waiting — share this ID with the other party';
-      });
-    };
-    s.onViewerJoined = (viewerId) async {
-      setState(() => _status = 'Viewer joined, starting stream...');
-      final rtc = WebRTCService(s, isHost: true);
-      rtc.onControlEvent = _handleIncomingControl;
-      _rtc = rtc;
-      await rtc.startHosting(viewerId);
-      setState(() => _status = 'Sharing ✓');
-    };
-    s.onSignal = (fromId, data) => _rtc?.handleRemoteSignal(data);
-    s.onError = (message) => setState(() => _status = 'Error: $message');
-  }
-
-  Future<void> _startInternetMode() async {
-    final client = SignalingClient(kSignalingUrl);
-    _signaling = client;
-    _wireSignaling(client);
-    client.connect();
-
-    // Using this phone's persistent unique ID instead of a random code —
-    // the ID stays the same even after reopening the app, no verification needed.
-    final id = await getOrCreateDeviceId();
-    client.createRoom(id);
-  }
-
-  Future<void> _startLocalMode() async {
-    setState(() => _status = 'Starting local server...');
-    final server = LocalSignalingServer();
-    _signaling = server;
-    _wireSignaling(server);
+  Future<void> _startHosting() async {
+    final rtc = WebRTCService(widget.signaling, isHost: true);
+    rtc.onControlEvent = _handleIncomingControl;
+    _rtc = rtc;
     try {
-      final addresses = await server.start();
-      setState(() {
-        _localAddresses = addresses;
-        _roomCode = addresses.isNotEmpty
-            ? '${addresses.first}:${LocalSignalingServer.defaultPort}'
-            : null;
-        _status = addresses.isEmpty
-            ? 'No local network found — connect to WiFi/LAN first'
-            : 'Waiting — enter this IP on the other device (same WiFi/LAN)';
-      });
+      await rtc.startHosting(widget.peerId);
+      if (mounted) setState(() => _status = 'Sharing ✓');
     } catch (e) {
-      setState(() => _status = 'Could not start local server: $e');
+      if (mounted) setState(() => _status = 'Could not start sharing: $e');
     }
   }
 
-  Future<void> _switchMode(ConnectMode mode) async {
-    if (mode == _mode) return;
-    _rtc?.dispose();
-    _signaling.dispose();
-    _rtc = null;
-    setState(() {
-      _mode = mode;
-      _roomCode = null;
-      _localAddresses = [];
-      _status = 'Generating ID...';
-    });
-    if (mode == ConnectMode.internetId) {
-      await _startInternetMode();
-    } else {
-      await _startLocalMode();
+  void _handleEvent(SignalingEvent event) {
+    if (!mounted) return;
+    switch (event) {
+      case SignalDataEvent(:final fromId, :final data):
+        if (fromId == widget.peerId) {
+          _rtc?.handleRemoteSignal(data);
+        }
+        break;
+      case PeerLeftEvent(:final peerId):
+        if (peerId == widget.peerId) {
+          _status = 'The other device disconnected';
+          Navigator.of(context).maybePop();
+        }
+        break;
+      default:
+        break;
     }
   }
 
   Future<void> _checkAccessibility() async {
-    // web প্রিভিউ বা অন্য প্ল্যাটফর্মে এই নেটিভ চ্যানেলের ইমপ্লিমেন্টেশন
-    // না থাকলেও (শুধু ডিজাইন দেখার জন্য), অ্যাপ যেন ভেঙে না পড়ে
     try {
       final on = await RemoteControlChannel.isAccessibilityEnabled();
       if (mounted) setState(() => _accessibilityOn = on);
@@ -620,10 +732,15 @@ class _HostScreenState extends State<HostScreen> {
     }
   }
 
+  void _endSession() {
+    widget.signaling.hangup(widget.peerId);
+    Navigator.of(context).maybePop();
+  }
+
   @override
   void dispose() {
-    _rtc?.dispose();
-    _signaling.dispose();
+    _sub?.cancel();
+    _rtc?.dispose(); // শুধু এই সেশনের P2P কানেকশন বন্ধ হয়, signaling খোলাই থাকে
     super.dispose();
   }
 
@@ -640,32 +757,14 @@ class _HostScreenState extends State<HostScreen> {
                 child: Row(
                   children: [
                     TopIconButton(
-                        icon: Icons.arrow_back,
-                        onTap: () => Navigator.pop(context)),
+                        icon: Icons.call_end, onTap: _endSession),
                     const SizedBox(width: 8),
-                    const Text('Hosting',
+                    const Text('Sharing your screen',
                         style: TextStyle(
                             color: Colors.white,
                             fontSize: 20,
                             fontWeight: FontWeight.w600)),
                   ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
-                child: SegmentedButton<ConnectMode>(
-                  segments: const [
-                    ButtonSegment(
-                        value: ConnectMode.internetId,
-                        icon: Icon(Icons.public),
-                        label: Text('Internet (ID)')),
-                    ButtonSegment(
-                        value: ConnectMode.localIp,
-                        icon: Icon(Icons.wifi),
-                        label: Text('Local Network (IP)')),
-                  ],
-                  selected: {_mode},
-                  onSelectionChanged: (s) => _switchMode(s.first),
                 ),
               ),
               Padding(
@@ -676,59 +775,13 @@ class _HostScreenState extends State<HostScreen> {
                     Text(_status,
                         style:
                             const TextStyle(color: Colors.white, fontSize: 16)),
+                    const SizedBox(height: 4),
+                    Text('Connected to: ${widget.peerId}',
+                        style: TextStyle(
+                            color: Colors.white.withOpacity(0.7),
+                            fontSize: 13)),
                     const SizedBox(height: 12),
-                    if (_roomCode != null)
-                      Card(
-                        child: ListTile(
-                          title: Text(
-                            _roomCode!,
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineMedium
-                                ?.copyWith(
-                                    letterSpacing: 2,
-                                    fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Text(_mode == ConnectMode.internetId
-                              ? 'Your Device ID'
-                              : 'Local IP:Port — must be on the same WiFi/LAN'),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.copy),
-                            tooltip: 'Copy',
-                            onPressed: () {
-                              Clipboard.setData(
-                                  ClipboardData(text: _roomCode!));
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                    content: Text(_mode ==
-                                            ConnectMode.internetId
-                                        ? 'ID copied'
-                                        : 'IP:Port copied')),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    // একাধিক নেটওয়ার্ক ইন্টারফেস (WiFi + Ethernet) থাকলে বাকি
-                    // ঠিকানাগুলোও ছোট করে দেখানো হচ্ছে — উপরে ভুল ইন্টারফেস
-                    // দেখালে ইউজার এখান থেকে সঠিকটা বেছে নিতে পারবেন
-                    if (_mode == ConnectMode.localIp &&
-                        _localAddresses.length > 1)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4, bottom: 4),
-                        child: Text(
-                          'Other network interfaces: '
-                          '${_localAddresses.skip(1).join(", ")}',
-                          style: TextStyle(
-                              color: Colors.white.withOpacity(0.6),
-                              fontSize: 12),
-                        ),
-                      ),
-                    const SizedBox(height: 8),
                     if (!_accessibilityOn)
-                      // Glass blur container — no solid background color,
-                      // just a frosted/blurred glass panel like the rest of
-                      // the app's UI.
                       ClipRRect(
                         borderRadius: BorderRadius.circular(16),
                         child: BackdropFilter(
@@ -810,42 +863,63 @@ class _HostScreenState extends State<HostScreen> {
   }
 }
 
-// ================= VIEWER SCREEN =================
+// ================= VIEWER SESSION SCREEN =================
+// আগের মতো ID/IP এন্ট্রি স্ক্রিন নেই — এটা শুধু তখনই খোলে যখন অপরপাশ
+// ইতিমধ্যে অনুরোধ accept করে ফেলেছে, তাই সরাসরি ভিডিও-ভিউ দেখানো শুরু করে।
 class ViewerScreen extends StatefulWidget {
-  const ViewerScreen({super.key});
+  final SignalingClient signaling;
+  final String peerId; // যার স্ক্রিন দেখছি/কন্ট্রোল করছি
+
+  const ViewerScreen(
+      {super.key, required this.signaling, required this.peerId});
+
   @override
   State<ViewerScreen> createState() => _ViewerScreenState();
 }
 
 class _ViewerScreenState extends State<ViewerScreen> {
-  final _codeController = TextEditingController();
-  final _ipController = TextEditingController();
-  SignalingBase? _signaling;
   WebRTCService? _rtc;
+  StreamSubscription<SignalingEvent>? _sub;
   final _renderer = RTCVideoRenderer();
-  bool _joined = false;
-
-  // ডিফল্টভাবে ইন্টারনেট (আইডি) মোডে জয়েন করে; ইউজার টগল করে লোকাল নেটওয়ার্ক
-  // (IP) মোডে গেলে host-এর IP:Port সরাসরি বসিয়ে কানেক্ট করতে পারবে
-  ConnectMode _mode = ConnectMode.internetId;
-
-  // host-এর ভিডিও landscape (PC/TV) নাকি portrait (মোবাইল) — এটা ট্র্যাক করে
-  // রাখা হয়, যাতে বারবার একই orientation সেট না করতে হয়
   bool _remoteIsLandscape = false;
+  bool _connected = false;
 
   @override
   void initState() {
     super.initState();
     _renderer.initialize();
-    // host-এর ভিডিওর সাইজ প্রথমবার জানা গেলে বা বদলালে এটা কল হয় —
-    // এখান থেকেই বোঝা যায় host portrait (মোবাইল) নাকি landscape (PC/TV) স্ট্রিম পাঠাচ্ছে
     _renderer.onResize = _handleRemoteResize;
+    _sub = widget.signaling.events.listen(_handleEvent);
   }
 
-  // host landscape (PC/TV) স্ক্রিন পাঠালে ভিউয়ার ফোনকেও landscape-এ ঘোরার
-  // অনুমতি দেওয়া হয় (তখন device rotation sensor অনুযায়ী ফোন নিজে থেকে
-  // landscape দেখাবে); host portrait (মোবাইল) হলে ফোন portrait-এই লক থাকে।
-  // এতে ভিডিওটা যতটা সম্ভব বড় ও সঠিক অনুপাতে দেখা যায়, ছোট letterbox হয়ে থাকে না।
+  void _handleEvent(SignalingEvent event) async {
+    if (!mounted) return;
+    switch (event) {
+      case SignalDataEvent(:final fromId, :final data):
+        if (fromId != widget.peerId) return;
+        if (_rtc == null) {
+          final rtc = WebRTCService(widget.signaling, isHost: false);
+          rtc.onRemoteStream = (stream) {
+            _renderer.srcObject = stream;
+            if (mounted) setState(() => _connected = true);
+          };
+          _rtc = rtc;
+          await rtc.prepareViewer(fromId);
+        }
+        await _rtc!.handleRemoteSignal(data);
+        break;
+      case PeerLeftEvent(:final peerId):
+        if (peerId == widget.peerId) {
+          Navigator.of(context).maybePop();
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  // host landscape (TV) স্ক্রিন পাঠালে ভিউয়ার ফোনকেও landscape-এ ঘোরার
+  // অনুমতি দেওয়া হয়; host portrait (মোবাইল) হলে ফোন portrait-এই লক থাকে।
   void _handleRemoteResize() {
     final w = _renderer.videoWidth;
     final h = _renderer.videoHeight;
@@ -860,46 +934,6 @@ class _ViewerScreenState extends State<ViewerScreen> {
     );
   }
 
-  void _wireViewerSignaling(SignalingBase s) {
-    s.onSignal = (fromId, data) async {
-      if (_rtc == null) {
-        final rtc = WebRTCService(s, isHost: false);
-        rtc.onRemoteStream = (stream) {
-          _renderer.srcObject = stream;
-          setState(() {});
-        };
-        _rtc = rtc;
-      }
-      await _rtc!.prepareViewer(fromId);
-      await _rtc!.handleRemoteSignal(data);
-    };
-  }
-
-  void _join() {
-    if (_mode == ConnectMode.internetId) {
-      final code = _codeController.text.trim();
-      if (code.isEmpty) return;
-      final client = SignalingClient(kSignalingUrl);
-      _signaling = client;
-      _wireViewerSignaling(client);
-      client.connect();
-      client.joinRoom(code);
-    } else {
-      final ip = _ipController.text.trim();
-      if (ip.isEmpty) return;
-      // শুধু IP দিলে ডিফল্ট পোর্ট যোগ হয়; "ip:port" আকারে দিলে সেটাই ব্যবহার হয়
-      final target =
-          ip.contains(':') ? ip : '$ip:${LocalSignalingServer.defaultPort}';
-      final client = SignalingClient('ws://$target');
-      _signaling = client;
-      _wireViewerSignaling(client);
-      client.connect();
-      client.joinRoom('direct'); // লোকাল মোডে room code-এর কোনো মানে নেই
-    }
-    setState(() => _joined = true);
-  }
-
-  // Convert trackpad pan/tap events into normalized (0-1) coordinates and send them
   void _sendTap(double xPercent, double yPercent) {
     _rtc?.sendControlEvent({'type': 'tap', 'x': xPercent, 'y': yPercent});
   }
@@ -909,23 +943,26 @@ class _ViewerScreenState extends State<ViewerScreen> {
         {'type': 'scroll', 'x': xPercent, 'y': yPercent, 'deltaY': deltaY});
   }
 
+  void _endSession() {
+    widget.signaling.hangup(widget.peerId);
+    Navigator.of(context).maybePop();
+  }
+
   @override
   void dispose() {
-    // এই স্ক্রিন ছাড়ার সময় অ্যাপ-ওয়াইড ডিফল্ট (পোর্ট্রেট)-এ ফিরিয়ে আনা হচ্ছে,
-    // যাতে ল্যান্ডস্কেপ স্ট্রিম দেখে বের হওয়ার পরেও বাকি অ্যাপ পোর্ট্রেটেই থাকে
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
     ]);
+    _sub?.cancel();
     _renderer.dispose();
-    _rtc?.dispose();
-    _signaling?.dispose();
+    _rtc?.dispose(); // শুধু এই সেশনের P2P কানেকশন বন্ধ হয়, signaling খোলাই থাকে
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_joined) {
+    if (!_connected) {
       return Scaffold(
         body: ScreenBackground(
           child: SafeArea(
@@ -937,10 +974,9 @@ class _ViewerScreenState extends State<ViewerScreen> {
                   child: Row(
                     children: [
                       TopIconButton(
-                          icon: Icons.arrow_back,
-                          onTap: () => Navigator.pop(context)),
+                          icon: Icons.call_end, onTap: _endSession),
                       const SizedBox(width: 8),
-                      const Text('Screen View',
+                      const Text('Connecting...',
                           style: TextStyle(
                               color: Colors.white,
                               fontSize: 20,
@@ -949,67 +985,13 @@ class _ViewerScreenState extends State<ViewerScreen> {
                   ),
                 ),
                 const Spacer(),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    children: [
-                      // Internet (ID) vs Local Network (IP) — কোন মোডে জয়েন
-                      // করবে সেটা এখান থেকে বেছে নেওয়া যায়
-                      SegmentedButton<ConnectMode>(
-                        segments: const [
-                          ButtonSegment(
-                            value: ConnectMode.internetId,
-                            icon: Icon(Icons.public),
-                            label: Text('ID (Internet)'),
-                          ),
-                          ButtonSegment(
-                            value: ConnectMode.localIp,
-                            icon: Icon(Icons.wifi),
-                            label: Text('IP (Local Network)'),
-                          ),
-                        ],
-                        selected: {_mode},
-                        onSelectionChanged: (s) =>
-                            setState(() => _mode = s.first),
-                      ),
-                      const SizedBox(height: 20),
-                      if (_mode == ConnectMode.internetId)
-                        TextField(
-                          controller: _codeController,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: const InputDecoration(
-                            labelText: 'Enter 9-digit ID',
-                            labelStyle: TextStyle(color: Colors.white70),
-                            enabledBorder: UnderlineInputBorder(
-                                borderSide: BorderSide(color: Colors.white54)),
-                          ),
-                          keyboardType: TextInputType.number,
-                        )
-                      else
-                        TextField(
-                          controller: _ipController,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: const InputDecoration(
-                            labelText: 'Enter host IP (e.g. 192.168.0.12)',
-                            labelStyle: TextStyle(color: Colors.white70),
-                            helperText:
-                                'Same WiFi/LAN — no internet needed. Add :port only if different from default.',
-                            helperStyle: TextStyle(color: Colors.white54),
-                            helperMaxLines: 2,
-                            enabledBorder: UnderlineInputBorder(
-                                borderSide: BorderSide(color: Colors.white54)),
-                          ),
-                          keyboardType: TextInputType.url,
-                        ),
-                      const SizedBox(height: 20),
-                      GlassGlowButton(
-                        icon: Icons.login,
-                        label: 'Connect',
-                        glowColor: const Color(0xFF05F411),
-                        onTap: _join,
-                      ),
-                    ],
-                  ),
+                const Center(
+                  child: CircularProgressIndicator(color: Colors.white70),
+                ),
+                const SizedBox(height: 16),
+                Center(
+                  child: Text('Waiting for video from ${widget.peerId}...',
+                      style: const TextStyle(color: Colors.white70)),
                 ),
                 const Spacer(flex: 2),
               ],
@@ -1020,7 +1002,12 @@ class _ViewerScreenState extends State<ViewerScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Live View')),
+      appBar: AppBar(
+        title: const Text('Live View'),
+        actions: [
+          IconButton(icon: const Icon(Icons.call_end), onPressed: _endSession),
+        ],
+      ),
       body: Stack(
         children: [
           Positioned.fill(
