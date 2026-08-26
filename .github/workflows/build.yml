@@ -82,28 +82,31 @@ jobs:
       - name: Enable Windows desktop support
         run: flutter config --enable-windows-desktop
 
+      # আগে "no such file or directory" এরর আসছিল flutter_windows.dll কপি
+      # করার সময় — কারণ ক্যাশ করা Flutter SDK-তে Windows ইঞ্জিনের আর্টিফ্যাক্ট
+      # ঠিকমতো ছিল না (আমরা কয়েকবার Flutter ভার্সন বদলানোর ফলে ক্যাশ
+      # অসামঞ্জস্যপূর্ণ হয়ে গিয়েছিল)। precache জোর করে এগুলো আবার
+      # ডাউনলোড/ভেরিফাই করবে বিল্ড শুরুর আগেই।
+      - name: Precache Windows engine artifacts
+        run: flutter precache --windows --force
+
       # -v (verbose) যোগ করা হলো — MSB8066 শুধু "একটা স্টেপ ফেইল করেছে" বলে,
       # আসল কারণ (কোন Dart/প্লাগইন ফাইলে সমস্যা) ডিফল্ট মোডে দেখায় না।
       # verbose মোডে Flutter তার ভেতরের সব স্টেপ প্রিন্ট করবে, তাই আসল
       # এররটা এবার লগে দেখা যাবে।
-      # flutter_assemble.rule vs flutter_windows.dll.rule এর মধ্যে একটা পরিচিত
-      # race-condition আছে (GitHub Windows রানারের নতুন VS টুলসেটে বেশি দেখা
-      # যায়) — এরর মেসেজে লেখা থাকে "items cannot be built in parallel"।
-      # প্রথমবার fail করলে ephemeral ফাইলগুলো ততক্ষণে জেনারেট হয়ে গেছে,
-      # তাই দ্বিতীয়বার চালালে সাধারণত সফল হয়ে যায়।
-      - name: Build Windows (release, verbose)
+      # Flutter-এর Windows CMake বিল্ড সিস্টেমে একটা পরিচিত race-condition bug
+      # আছে (flutter/flutter#84115, #127686, #117754): flutter_windows.dll
+      # জেনারেট করা আর flutter_assemble রুল কখনো কখনো একসাথে চালানোর চেষ্টা
+      # হয়, ফলে "items cannot be built in parallel" বলে ফেইল করে। এটা
+      # সাধারণত দ্বিতীয়বার রান করলেই ঠিক হয়ে যায় (প্রথমবারেই দরকারি ফাইল
+      # ডিস্কে তৈরি হয়ে যায়) — তাই এখানে স্বয়ংক্রিয় রিট্রাই বসানো হলো।
+      - name: Build Windows (release, with retry for known Flutter CMake race-condition)
         shell: pwsh
         run: |
           flutter build windows --release -v
           if ($LASTEXITCODE -ne 0) {
-            Write-Host "প্রথম attempt fail করেছে (পরিচিত flutter_assemble race condition), আবার চেষ্টা করা হচ্ছে..."
+            Write-Host "প্রথম চেষ্টা ব্যর্থ (পরিচিত Flutter CMake race-condition) — আবার চেষ্টা করা হচ্ছে..."
             flutter build windows --release -v
-            if ($LASTEXITCODE -ne 0) {
-              Write-Host "দ্বিতীয়বারও fail করেছে, ephemeral ফোল্ডার ক্লিন করে তৃতীয়বার চেষ্টা করা হচ্ছে..."
-              Remove-Item -Recurse -Force "windows\flutter\ephemeral" -ErrorAction SilentlyContinue
-              Remove-Item -Recurse -Force "build\windows" -ErrorAction SilentlyContinue
-              flutter build windows --release -v
-            }
           }
 
       # পুরো Release ফোল্ডার (exe + দরকারি .dll + data) একটা zip-এ — এটাই
