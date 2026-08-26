@@ -66,11 +66,18 @@ jobs:
       # রান হওয়ার সময় সবচেয়ে নতুন Flutter টেনে আনতো — ফলে প্রতিবার নতুন
       # Gradle/AGP/Kotlin দাবি করে বিল্ড ভেঙে যাচ্ছিল। এখন একটা নির্দিষ্ট,
       # টেস্ট-করা ভার্সনে আটকে রাখা হলো যাতে বিল্ড স্থিতিশীল থাকে)
+      # cache: false — এই কথোপকথনে কয়েকবার Flutter ভার্সন বদলানোর ফলে
+      # GitHub Actions-এর ক্যাশ করা Flutter SDK কপি সম্ভবত আংশিক/ভাঙা হয়ে
+      # গিয়েছিল (tool_backend.bat-এর মতো জরুরি ফাইল অনুপস্থিত ছিল, যেটা
+      # ephemeral flutter_windows.dll জেনারেট করে) — "no such file or
+      # directory" এররটার এটাই সবচেয়ে সম্ভাব্য কারণ। ক্যাশ বন্ধ করে দিলে
+      # প্রতিবার সম্পূর্ণ, ঠিকঠাক Flutter SDK ডাউনলোড হবে (একটু ধীর হবে,
+      # কিন্তু নির্ভরযোগ্য)।
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.44.7"
           channel: "stable"
-          cache: true
+          cache: false
 
       - name: Install dependencies
         run: flutter pub get
