@@ -42,6 +42,23 @@ android {
         main.java.srcDirs += "src/main/kotlin"
     }
 
+    // ⚠️ এখানে ইচ্ছাকৃতভাবে একটা স্থির (fixed) debug keystore (android/app/debug.keystore,
+    // রিপোতে কমিট করা) ব্যবহার করা হচ্ছে — GitHub Actions-এর ডিফল্ট debug keystore ব্যবহার
+    // করলে প্রতিটা CI রানে (ফ্রেশ রানার) একটা নতুন, র‍্যান্ডম সিগনেচারের keystore তৈরি হতো,
+    // ফলে প্রতিটা বিল্ডের APK ভিন্ন সিগনেচারে সাইন হচ্ছিল আর ফোনে আগের বিল্ড ইনস্টল থাকলে
+    // নতুনটা "App not installed" এরর দিয়ে রিজেক্ট হয়ে যেত (সিগনেচার মিসম্যাচ, package name
+    // একই)। এই স্থির keystore দিয়ে প্রতিটা CI বিল্ড একই সিগনেচার পাবে, তাই নতুন APK আগেরটার
+    // উপর normal আপডেট হিসেবে বসে যাবে — এটা শুধু টেস্টিং/ডেভ পারপাসে, Play Store release
+    // keystore আলাদা ও গোপন রাখতে হবে (README-তে উল্লেখ আছে)।
+    signingConfigs {
+        debug {
+            storeFile file("debug.keystore")
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
+        }
+    }
+
     defaultConfig {
         applicationId "com.example.remotescreen"
         // flutter_webrtc + MediaProjection/AccessibilityService নির্ভরতার জন্য 24 (Android 7.0)-এর
