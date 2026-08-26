@@ -104,16 +104,30 @@ jobs:
       # Flutter-এর Windows CMake বিল্ড সিস্টেমে একটা পরিচিত race-condition bug
       # আছে (flutter/flutter#84115, #127686, #117754): flutter_windows.dll
       # জেনারেট করা আর flutter_assemble রুল কখনো কখনো একসাথে চালানোর চেষ্টা
-      # হয়, ফলে "items cannot be built in parallel" বলে ফেইল করে। এটা
-      # সাধারণত দ্বিতীয়বার রান করলেই ঠিক হয়ে যায় (প্রথমবারেই দরকারি ফাইল
-      # ডিস্কে তৈরি হয়ে যায়) — তাই এখানে স্বয়ংক্রিয় রিট্রাই বসানো হলো।
-      - name: Build Windows (release, with retry for known Flutter CMake race-condition)
+      # হয়, ফলে "items cannot be built in parallel" বলে ফেইল করে।
+      #
+      # আগের retry ভুল ছিল: শুধু `flutter build windows` আবার চালানো হতো,
+      # কিন্তু build\ ফোল্ডারের CMakeCache.txt ডিলিট না করার কারণে দ্বিতীয়বারও
+      # সেই একই ভাঙা/অসামঞ্জস্যপূর্ণ CMake কনফিগারেশন রিইউজ হয়ে যাচ্ছিল
+      # (লগে "Configuring done (0.0s)" প্রমাণ করে এটা রিজেনারেট হচ্ছিল না)।
+      # তাই এবার retry-র আগে build\windows আর windows\flutter\ephemeral
+      # সম্পূর্ণ ডিলিট করে দেওয়া হচ্ছে, যাতে সত্যিকারের ফ্রেশ CMake
+      # কনফিগারেশন থেকে আবার বিল্ড হয়।
+      - name: Build Windows (release, with true clean retry for known Flutter CMake race-condition)
         shell: pwsh
         run: |
           flutter build windows --release -v
           if ($LASTEXITCODE -ne 0) {
-            Write-Host "প্রথম চেষ্টা ব্যর্থ (পরিচিত Flutter CMake race-condition) — আবার চেষ্টা করা হচ্ছে..."
+            Write-Host "প্রথম চেষ্টা ব্যর্থ (পরিচিত Flutter CMake race-condition) — build ক্যাশ মুছে ফ্রেশ থেকে আবার চেষ্টা করা হচ্ছে..."
+            Remove-Item -Recurse -Force "build\windows" -ErrorAction SilentlyContinue
+            Remove-Item -Recurse -Force "windows\flutter\ephemeral" -ErrorAction SilentlyContinue
             flutter build windows --release -v
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "দ্বিতীয় চেষ্টাও ব্যর্থ — আবার ফ্রেশ ক্লিন করে শেষবার চেষ্টা করা হচ্ছে..."
+              Remove-Item -Recurse -Force "build\windows" -ErrorAction SilentlyContinue
+              Remove-Item -Recurse -Force "windows\flutter\ephemeral" -ErrorAction SilentlyContinue
+              flutter build windows --release -v
+            }
           }
 
       # পুরো Release ফোল্ডার (exe + দরকারি .dll + data) একটা zip-এ — এটাই
