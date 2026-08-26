@@ -22,6 +22,10 @@ android/gradlew.log
 **/android/**/gradle-wrapper.jar.log
 *.jks
 *.keystore
+# ⚠️ ব্যতিক্রম: android/app/debug.keystore ইচ্ছাকৃতভাবে কমিট করা — যাতে প্রতিটা CI বিল্ড
+# একই স্থির সিগনেচারে সাইন হয় (উপরের build.gradle-এর কমেন্ট দেখুন)। এটা শুধু debug/টেস্টিং
+# keystore, Play Store release keystore না — তাই কমিট করা নিরাপদ।
+!android/app/debug.keystore
 
 # --- iOS/macOS (রাখা হয়েছে, শুধু ফাইল এরর না হওয়ার জন্য — বিল্ড করা হচ্ছে না) ---
 ios/Pods/
