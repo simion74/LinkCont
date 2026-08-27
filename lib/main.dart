@@ -350,7 +350,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: IdDisplayCard(
                   icon: Icons.badge_outlined,
                   label: _deviceId ?? 'Generating ID...',
-                  glowColor: const Color(0xFF3ED67A),
+                  glowColor: const Color(0xff04c852),
                   onCopy: _copyId,
                   borderRadius: 12,
                   baseBorderWidth: 2.2,
@@ -360,7 +360,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(width: 10),
               GlassCircleIconButton(
                 icon: Icons.share_outlined,
-                glowColor: const Color(0xFF3ED67A),
+                glowColor: const Color(0xff03db59),
                 onTap: _shareId,
               ),
             ],
@@ -405,7 +405,7 @@ class _HomeScreenState extends State<HomeScreen> {
             GlassGlowButton(
               icon: Icons.login,
               label: 'Connect',
-              glowColor: const Color(0xFF4FC3F7),
+              glowColor: const Color(0xff20baff),
               borderRadius: 12,
               onTap: _connect,
             ),
