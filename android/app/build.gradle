@@ -60,7 +60,14 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.example.remotescreen"
+        // ⚠️ আগে "com.example.remotescreen" ছিল — এটা Flutter/Android টিউটোরিয়ালের
+        // খুব কমন ডিফল্ট নাম, তাই ফোনে থাকা অন্য কোনো টেস্ট/ডেমো অ্যাপের সাথে
+        // এই ID কনফ্লিক্ট করে "App not installed" এরর দিতে পারে (Play Protect
+        // আর সিগনেচার দুটোই ঠিক থাকা সত্ত্বেও)। এখন নিজস্ব, ইউনিক ID।
+        // ⚠️ namespace (উপরে) ইচ্ছাকৃতভাবে বদলানো হয়নি — সেটা Kotlin ফাইলের
+        // package declaration-এর সাথে মিলতে হয়, কিন্তু applicationId (এখানে)
+        // পুরোপুরি স্বাধীনভাবে বদলানো যায়, কোনো Kotlin ফাইল ছোঁয়া লাগে না।
+        applicationId "com.linkcont.remotescreen"
         // flutter_webrtc + MediaProjection/AccessibilityService নির্ভরতার জন্য 24 (Android 7.0)-এর
         // নিচে নামানো উচিত না — নিচে নামালে বিল্ড/রানটাইম এরর হতে পারে
         minSdk 24
